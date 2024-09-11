@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import 'dart:io' as io;
+import 'package:flutter_cache_manager/src/storage/cache_object.dart';
+import 'package:flutter_cache_manager/src/storage/file_system/file_system.dart';
 
 ///Flutter Cache Manager
 ///Copyright (c) 2019 Rene Floor
@@ -154,11 +154,9 @@ class CacheStore {
     final provider = await _cacheInfoRepository;
     final toRemove = <int>[];
     final allObjects = await provider.getAllObjects();
-    var futures = <Future>[];
     for (final cacheObject in allObjects) {
-      futures.add(_removeCachedFile(cacheObject, toRemove));
+      _removeCachedFile(cacheObject, toRemove);
     }
-    await Future.wait(futures);
     await provider.deleteAll(toRemove);
   }
 
@@ -182,36 +180,16 @@ class CacheStore {
       _memCache.remove(cacheObject.key);
     }
     if (_futureCache.containsKey(cacheObject.key)) {
-      await _futureCache.remove(cacheObject.key);
+      _futureCache.remove(cacheObject.key);
     }
-    final file = io.File(cacheObject.relativePath);
-
-    if (file.existsSync()) {
-      try {
-        await file.delete();
-        // ignore: unused_catch_clause
-      } on PathNotFoundException catch (e) {
-        // File has already been deleted. Do nothing #184
-      }
+    final file = await fileSystem.createFile(cacheObject.relativePath);
+    if (await file.exists()) {
+      await file.delete();
     }
-  }
-
-  bool memoryCacheContainsKey(String key) {
-    return _memCache.containsKey(key);
   }
 
   Future<void> dispose() async {
     final provider = await _cacheInfoRepository;
     await provider.close();
-  }
-
-  Future<int> getCacheSize() async {
-    final provider = await _cacheInfoRepository;
-    final allObjects = await provider.getAllObjects();
-    int total = 0;
-    for (var cacheObject in allObjects) {
-      total += cacheObject.length ?? 0;
-    }
-    return total;
   }
 }
